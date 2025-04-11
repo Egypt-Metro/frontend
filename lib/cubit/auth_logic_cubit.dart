@@ -1,7 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-
+import 'package:shared_preferences/shared_preferences.dart';
 // API Endpoints
 class AuthLogicCubit extends Cubit<AuthLogicState> {
   AuthLogicCubit() : super(AuthLogicInitial());
@@ -9,39 +9,103 @@ class AuthLogicCubit extends Cubit<AuthLogicState> {
   final String loginUrl = "https://backend-54v5.onrender.com/api/users/login/";
 
   // Login Function
-  Future<void> onLoginButtonPressed(String username, String password) async {
+ Future<void> onLoginButtonPressed(String username, String password) async {
+
     if (username.isEmpty || password.isEmpty) {
+
       emit(AuthLogicError("Fields cannot be empty"));
+
       return;
+
     }
+
+
     try {
+
       emit(AuthLogicLoading());
 
+
       final requestBody = {
+
         "username": username,
+
         "password": password,
+
       };
 
+
+      // إضافة print للتحقق من البيانات المرسلة
+
+      print('Sending login request with data: ${json.encode(requestBody)}');
+
+
       final response = await http.post(
+
         Uri.parse(loginUrl),
+
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode(requestBody),
+
+        body: json.encode(requestBody),
+
       );
 
-      final responseBody = jsonDecode(response.body);
+
+      // طباعة استجابة السيرفر للتحقق
+
+      print('Server response: ${response.body}');
+
+      print('Response status code: ${response.statusCode}');
+
 
       if (response.statusCode == 200) {
-        emit(AuthLogicSuccess("Login Successful!"));
-      } else if (responseBody is Map && responseBody.isNotEmpty) {
-        // Extract error messages from backend
-        final errorMessages = responseBody.values.join(", ");
-        emit(AuthLogicError(errorMessages));
+
+        final responseBody = json.decode(response.body);
+
+        
+
+        // التحقق من نجاح العملية
+
+        if (responseBody['success'] == true) {
+
+          // حفظ التوكن من المسار الصحيح في الاستجابة
+
+          final prefs = await SharedPreferences.getInstance();
+
+          await prefs.setString('access_token', responseBody['data']['access']);
+
+          await prefs.setString('refresh_token', responseBody['data']['refresh']);
+
+          
+
+          // حفظ بيانات المستخدم إذا كنت تحتاجها
+
+          await prefs.setString('user_data', json.encode(responseBody['data']['user']));
+
+
+          emit(AuthLogicSuccess(responseBody['message'] ?? "Login Successful!"));
+
+        } else {
+
+          emit(AuthLogicError(responseBody['message'] ?? "Login failed"));
+
+        }
+
       } else {
-        emit(AuthLogicError("Unknown error occurred"));
+
+        final responseBody = json.decode(response.body);
+
+        emit(AuthLogicError(responseBody['message'] ?? "Login failed"));
+
       }
+
     } catch (e) {
+
+      print('Login error: $e'); // طباعة الخطأ للتحقق
+
       emit(AuthLogicError("Failed to connect to the server"));
+
     }
+
   }
 
   // Sign-Up Function
