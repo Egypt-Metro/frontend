@@ -1,6 +1,80 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class SubscriptionPage extends StatelessWidget {
+  // إضافة دالة للتعامل مع API الاشتراكات
+  Future<void> createSubscription(BuildContext context, int zonesCount) async {
+  try {
+    // الحصول على access token
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login first')),
+      );
+      return;
+    }
+
+    // عرض مؤشر التحميل
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+
+    final response = await http.post(
+      Uri.parse('https://backend-54v5.onrender.com/api/tickets/subscriptions/purchase-with-wallet/'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode({
+        'subscription_type': 'MONTHLY',
+        'zones_count': zonesCount,
+      }),
+    );
+
+    // إخفاء مؤشر التحميل
+    Navigator.pop(context);
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(responseData['message'] ?? 'Subscription created successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // إغلاق الصفحة بعد نجاح العملية
+      Navigator.pop(context);
+    } else {
+      final responseData = json.decode(response.body);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(responseData['message'] ?? 'Failed to create subscription'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  } catch (e) {
+    // إخفاء مؤشر التحميل في حالة حدوث خطأ
+    Navigator.pop(context);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -9,7 +83,8 @@ class SubscriptionPage extends StatelessWidget {
           "Subscription Plans",
           style: TextStyle(
             fontSize: 20,
-            fontWeight: FontWeight.bold,color: Colors.white
+            fontWeight: FontWeight.bold,
+            color: Colors.white
           ),
         ),
         backgroundColor: Colors.blue,
@@ -49,38 +124,68 @@ class SubscriptionPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              _buildSubscriptionCard(
-                title: "Basic Plan",
-                subtitle: "One Region",
-                price: "310",
-                features: ["Access to one region", "Monthly renewal", ],
-                color: Colors.blue,
-                isPopular: false,
-              ),
-              _buildSubscriptionCard(
-                title: "Standard Plan",
-                subtitle: "Two Regions",
-                price: "365",
-                features: ["Access to two regions", "Monthly renewal", ],
-                color: Colors.purple,
-                isPopular: true,
-              ),
-              _buildSubscriptionCard(
-                title: "Premium Plan",
-                subtitle: "3 or 4 Regions",
-                price: "425",
-                features: ["Access to 3-4 regions", "Monthly renewal", ],
-                color: Colors.orange,
-                isPopular: false,
-              ),
-              _buildSubscriptionCard(
-                title: "Ultimate Plan",
-                subtitle: "5 or 6 Regions",
-                price: "600",
-                features: ["Access to all regions", "Monthly renewal", ],
-                color: Colors.green,
-                isPopular: false,
-              ),
+              // في دالة build، داخل Column نعدل الكروت كالتالي:
+
+_buildSubscriptionCard(
+  context: context,
+  title: "Basic Plan",
+  subtitle: "One Region",
+  price: "310",
+  features: ["Access to one region", "Monthly renewal"],
+  color: Colors.blue,
+  isPopular: false,
+  zonesCount: 1,
+),
+_buildSubscriptionCard(
+  context: context,
+  title: "Standard Plan",
+  subtitle: "Two Regions",
+  price: "365",
+  features: ["Access to two regions", "Monthly renewal"],
+  color: Colors.purple,
+  isPopular: true,
+  zonesCount: 2,
+),
+_buildSubscriptionCard(
+  context: context,
+  title: "Premium Plan",
+  subtitle: "Three Regions",
+  price: "425",
+  features: ["Access to three regions", "Monthly renewal"],
+  color: Colors.orange,
+  isPopular: false,
+  zonesCount: 3,
+),
+_buildSubscriptionCard(
+  context: context,
+  title: "Premium Plan",
+  subtitle: "Four Regions",
+  price: "425",
+  features: ["Access to four regions", "Monthly renewal"],
+  color: Colors.orange.shade700,
+  isPopular: false,
+  zonesCount: 4,
+),
+_buildSubscriptionCard(
+  context: context,
+  title: "Ultimate Plan",
+  subtitle: "Five Regions",
+  price: "600",
+  features: ["Access to five regions", "Monthly renewal"],
+  color: Colors.green,
+  isPopular: false,
+  zonesCount: 5,
+),
+_buildSubscriptionCard(
+  context: context,
+  title: "Ultimate Plan",
+  subtitle: "Six Regions",
+  price: "600",
+  features: ["Access to six regions", "Monthly renewal"],
+  color: Colors.green.shade700,
+  isPopular: false,
+  zonesCount: 6,
+),
             ],
           ),
         ),
@@ -89,12 +194,14 @@ class SubscriptionPage extends StatelessWidget {
   }
 
   Widget _buildSubscriptionCard({
+    required BuildContext context,
     required String title,
     required String subtitle,
     required String price,
     required List<String> features,
     required Color color,
     required bool isPopular,
+    required int zonesCount,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -147,7 +254,6 @@ class SubscriptionPage extends StatelessWidget {
                           ),
                         ],
                       ),
-                      
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -199,7 +305,7 @@ class SubscriptionPage extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () => createSubscription(context, zonesCount),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: color,
                             padding: const EdgeInsets.symmetric(vertical: 15),
@@ -211,7 +317,8 @@ class SubscriptionPage extends StatelessWidget {
                             "Subscribe Now",
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.bold,color: Colors.white
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white
                             ),
                           ),
                         ),
